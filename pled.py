@@ -5,6 +5,7 @@ Python Line EDiting
 from __future__ import print_function, unicode_literals
 __metaclass__ = type
 
+import os
 import sys
 
 class TermIO:
@@ -15,8 +16,8 @@ class TermIO:
         try:
             from msvcrt import getch
         except ImportError:
+            import tty, termios
             def getch():
-                import tty, termios
                 infile = sys.stdin.fileno()
                 old_settings = termios.tcgetattr(infile)
                 try:
@@ -24,13 +25,7 @@ class TermIO:
                     return sys.stdin.read(1)
                 finally:
                     termios.tcsetattr(infile, termios.TCSADRAIN, old_settings)
-        def wrapper():
-            ch = getch()
-            if ch == u'\x1c':
-                print('\nQuit.')
-                sys.exit(1)
-            return ch
-        return wrapper
+            return getch
     def getch(self):
         if len(self.queue):
             return self.queue.pop()
@@ -43,26 +38,24 @@ getch = _TermIO.getch
 putch = _TermIO.putch
 
 def getTerminalWidth():
-    import os
-    env = os.environ
-    def ioctl_GWINSZ(fd):
+    def screen_size(fd):
         try:
-            import fcntl, termios, struct, os
+            import fcntl, termios, struct
             cr = struct.unpack(b'hh', fcntl.ioctl(fd, termios.TIOCGWINSZ,
         '1234'))
         except Exception:
             return
         return cr
-    cr = ioctl_GWINSZ(0) or ioctl_GWINSZ(1) or ioctl_GWINSZ(2)
+    cr = screen_size(0) or screen_size(1) or screen_size(2)
     if not cr:
         try:
             fd = os.open(os.ctermid(), os.O_RDONLY)
-            cr = ioctl_GWINSZ(fd)
+            cr = screen_size(fd)
             os.close(fd)
         except:
             pass
     if not cr:
-        cr = (None, env.get('COLUMNS', 80))
+        cr = (None, os.environ.get('COLUMNS', 80))
     return cr[1]
 
 class Reader:
@@ -210,6 +203,11 @@ class TTYReaderHooks:
             reader.cursor_pos += 10*d
 
     @staticmethod
+    def quit(reader):
+        print('\n')
+        sys.exit(1)
+
+    @staticmethod
     def delete(reader):
         if reader.cursor_pos == 0:
             return
@@ -228,6 +226,7 @@ TTYReaderDefaultHooks = {
     '\x15': [TTYReaderHooks.kill_left],
     '\x14': [TTYReaderHooks.swap],
     '\x1b': [TTYReaderHooks.handle_escape],
+    '\x1c': [TTYReaderHooks.quit],
     '\x7f': [TTYReaderHooks.delete],
 }
 

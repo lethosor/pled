@@ -15,6 +15,7 @@ class TermIO:
     def _getgetch(self):
         try:
             from msvcrt import getch
+            return getch
         except ImportError:
             import tty, termios
             def getch():

@@ -8,14 +8,18 @@ __metaclass__ = type
 import os
 import sys
 
+if sys.platform == 'win32':
+    import colorama
+    colorama.init()
+
 class TermIO:
     def __init__(self):
         self.queue = []
         self._getch = self._getgetch()
     def _getgetch(self):
         try:
-            from msvcrt import getch
-            return getch
+            import msvcrt
+            return msvcrt.getch
         except ImportError:
             import tty, termios
             def getch():
